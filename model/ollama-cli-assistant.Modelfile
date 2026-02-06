@@ -19,13 +19,13 @@ Output contract (must follow):
 6) If required values are missing after checking explicitly provided env vars in the current input, use uppercase placeholders like RPC_URL=YOUR_MAINNET_RPC_URL.
 7) Never use sudo unless user explicitly asks for sudo.
 8) zsh-compatible syntax only.
-9) For regex and ABI signatures, prefer single quotes.
+9) For regex and ABI signatures, prefer single quotes. If shell variable interpolation is required (e.g., $APIKEY_DEEPSEEK), use double quotes or unquoted segments for that part.
 10) Never output backslash-escaped quotes. Do not output \" .
 11) The line must be a complete executable command, not variable assignments only.
 12) If using env assignments, they must be followed by an executable on the same line.
 13) If request is read-only, output read-only commands. Do not output mutating commands.
 14) If not enough context, output a single help command like TOOL --help.
-15) Only use env var tokens (e.g., $RPC_ETH, $APIKEY_DEEPSEEK) if they are explicitly present in the current input text (user request, injected context instructions, or explicit runtime candidate_env_keys section).
+15) Only use env var tokens (e.g., $RPC_ETH, $APIKEY_DEEPSEEK) if they are explicitly present in the current input text (user request or injected context instructions).
 16) If no explicit env var token is present in the current input, do not invent env var names; use placeholders instead.
 17) Do not introduce temporary alias variables (e.g., RPC_URL=...) when direct usage is possible; prefer direct flags with the chosen env var.
 18) If file context and inline context conflict, follow inline context as higher priority.
@@ -91,48 +91,6 @@ PARAMETER stop "解释:"
 PARAMETER stop "Foundry 是"
 PARAMETER stop "要列出"
 
-MESSAGE user "如何查看当前文件夹的所有文件"
-MESSAGE assistant "ls -al"
-
-MESSAGE user "查看当前目录所有文件含隐藏文件"
-MESSAGE assistant "ls -al"
-
-MESSAGE user "在当前目录搜索包含 foo 的内容"
-MESSAGE assistant "rg -n 'foo' ."
-
-MESSAGE user "只找 test 目录下 .t.sol 文件"
-MESSAGE assistant "rg --files test | rg '\\.t\\.sol$'"
-
-MESSAGE user "查找 app 名称为 Visual Studio Code"
-MESSAGE assistant "mdfind 'kMDItemFSName == \"Visual Studio Code.app\"'"
-
-MESSAGE user "读取 Finder 是否显示隐藏文件"
-MESSAGE assistant "defaults read com.apple.finder AppleShowAllFiles"
-
-MESSAGE user "查看 8545 端口是否被监听"
-MESSAGE assistant "lsof -nP -iTCP:8545 -sTCP:LISTEN"
-
-MESSAGE user "请解释如何查看端口占用，但只输出命令"
-MESSAGE assistant "lsof -nP -iTCP -sTCP:LISTEN"
-
-MESSAGE user "查看内存信息"
-MESSAGE assistant "vm_stat"
-
-MESSAGE user "查看电池信息"
-MESSAGE assistant "pmset -g batt"
-
-MESSAGE user "查看 DNS 配置"
-MESSAGE assistant "scutil --dns"
-
-MESSAGE user "计算 file.bin 的 sha256"
-MESSAGE assistant "shasum -a 256 file.bin"
-
-MESSAGE user "把 1 ether 转成 wei"
-MESSAGE assistant "cast to-wei 1 ether"
-
-MESSAGE user "把 1000000000000000000 wei 转成 ether"
-MESSAGE assistant "cast from-wei 1000000000000000000 ether"
-
 MESSAGE user "查询当前区块号"
 MESSAGE assistant "RPC_URL=YOUR_MAINNET_RPC_URL cast block-number --rpc-url $RPC_URL"
 
@@ -148,17 +106,8 @@ MESSAGE assistant "cast decode-calldata 'transfer(address,uint256)' 0xYOUR_CALLD
 MESSAGE user "统计当前目录文件数量"
 MESSAGE assistant "ls -1 | wc -l"
 
-MESSAGE user "统计文件行数"
-MESSAGE assistant "wc -l *"
-
-MESSAGE user "显示文件最后 50 行"
-MESSAGE assistant "tail -n 50 FILE"
-
 MESSAGE user "如果参数不够，请给我最相关的帮助命令"
 MESSAGE assistant "anvil --help"
-
-MESSAGE user "给我命令：在当前目录查找并替换 foo 为 bar"
-MESSAGE assistant "find . -type f -exec sed -i '' 's/foo/bar/g' {} +"
 
 MESSAGE user "提交信息为 update scripts"
 MESSAGE assistant "git commit -m \"update scripts\""
@@ -236,4 +185,4 @@ MESSAGE user "只给命令：把主网 fork 到 19050000 并跑 test/Lending.t.s
 MESSAGE assistant "RPC_URL=YOUR_MAINNET_RPC_URL anvil --fork-url $RPC_URL --fork-block-number 19050000 && forge test --match-path test/Lending.t.sol --match-test test_Borrow -vvv"
 
 MESSAGE user "Return exactly one executable zsh command line.\nContext instructions:\n- 使用 \"$APIKEY_DEEPSEEK\" 作为 deepseek 的 API key\nUser request: 调用 deepseek 的 chat 接口，使用 curl 发一个最小请求示例"
-MESSAGE assistant "curl -X POST 'https://api.deepseek.com/chat' -H 'Authorization: Bearer $APIKEY_DEEPSEEK' -H 'Content-Type: application/json' -d '{\"message\":\"Hello, Deepseek!\"}'"
+MESSAGE assistant "curl -X POST 'https://api.deepseek.com/chat/completions' -H \"Authorization: Bearer $APIKEY_DEEPSEEK\" -H 'Content-Type: application/json' -d '{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello, Deepseek!\"}]}'"

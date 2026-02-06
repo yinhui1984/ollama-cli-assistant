@@ -238,6 +238,7 @@ run_once() {
   local ollama_pid
   local ttft_ms="N/A"
   local stream_enabled=0
+  local stream_started=0
 
   t_start="$(now_ms)"
   runtime_context="$(build_runtime_context)"
@@ -352,7 +353,19 @@ User request: $prompt"
   fi
 
   if [[ "$stream_enabled" -eq 1 ]]; then
-    ollama run "$MODEL" "$full_prompt"
+    # Character-level real-time stream for better perceived latency.
+    # Also normalize model newlines into spaces to keep one-shell-line output.
+    while IFS= read -r -n 1 ch; do
+      if [[ "$ch" == $'\r' || "$ch" == $'\n' ]]; then
+        if [[ "$stream_started" -eq 1 ]]; then
+          printf ' '
+        fi
+      else
+        printf '%s' "$ch"
+        stream_started=1
+      fi
+    done < <(ollama run "$MODEL" "$full_prompt")
+    printf '\n'
     return
   fi
 
