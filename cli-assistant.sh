@@ -129,18 +129,56 @@ collect_candidate_env_keys() {
   local max_keys=80
   local keys
   keys="$(env | sed -E 's/=.*$//' | LC_ALL=C sort)"
-  printf '%s\n' "$keys" | grep -E '(^RPC_|URL|TOKEN|KEY|SECRET|PASS|PRIVATE|DATABASE|DB_)' | head -n "$max_keys" || true
+  printf '%s\n' "$keys" | grep -E '(^RPC_|^APIKEY_|_API_KEY$|_TOKEN$|^DATABASE_URL$|^DB_.*|^PRIVATE_KEY$|^ETHERSCAN_API_KEY$)' | head -n "$max_keys" || true
 }
 
 sanitize_model_output() {
   local raw_output="$1"
-  local first_line
+  local normalized
+  local command_line=""
+  local line
+  local trimmed
+  local first_non_empty_seen=0
 
-  first_line="$(printf '%s\n' "$raw_output" | tr -d '\r' | sed '/^[[:space:]]*$/d' | head -n 1)"
-  first_line="${first_line#\`}"
-  first_line="${first_line%\`}"
-  first_line="$(printf '%s' "$first_line" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
-  printf '%s' "$first_line"
+  normalized="$(printf '%s\n' "$raw_output" | tr -d '\r')"
+
+  while IFS= read -r line; do
+    trimmed="$(printf '%s' "$line" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
+    [[ -z "$trimmed" ]] && continue
+
+    if [[ "$first_non_empty_seen" -eq 0 ]]; then
+      command_line="$trimmed"
+      first_non_empty_seen=1
+      continue
+    fi
+
+    case "$trimmed" in
+      \`\`\`*|"Explanation:"*|"解释："*|"解释:"*)
+        break
+        ;;
+    esac
+
+    if [[ "$command_line" =~ (\\|&&|\|\||\|)$ || "$command_line" =~ [\(\[]$ || "$trimmed" == --* || "$trimmed" == \$* ]]; then
+      command_line="$command_line $trimmed"
+      continue
+    fi
+
+    local single_quotes_count
+    local double_quotes_count
+    single_quotes_count="$(printf '%s' "$command_line" | tr -cd "'" | wc -c | tr -d '[:space:]')"
+    double_quotes_count="$(printf '%s' "$command_line" | tr -cd '"' | wc -c | tr -d '[:space:]')"
+    if (( single_quotes_count % 2 == 1 || double_quotes_count % 2 == 1 )); then
+      command_line="$command_line $trimmed"
+      continue
+    fi
+
+    break
+  done <<< "$normalized"
+
+  command_line="${command_line#\`}"
+  command_line="${command_line%\`}"
+  command_line="$(printf '%s' "$command_line" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
+  printf '%s' "$command_line"
 }
 
 build_runtime_context() {
@@ -244,11 +282,19 @@ Instruction priority:
 1) User request
 2) Context instructions
 3) Runtime context
+Conflict resolution:
+- If both file context and inline context are present, inline context (--context) has higher priority.
+- When context instructions conflict, the later instruction is higher priority.
 Context usage rules:
 - Treat context instructions as durable user preferences and constraints.
 - If context includes explicit env var tokens (for example \$RPC_ETH), use those exact tokens verbatim when relevant.
+- If no explicit context token is provided for a required parameter, prefer an existing candidate_env_keys variable over placeholders.
 - Do not rename context-provided env vars into temporary aliases unless the user explicitly asks.
-- If relevant context already provides a value token, do not emit placeholders like YOUR_*.
+- Prefer direct usage (for example: anvil --fork-url \$RPC_ETH) over alias chains (for example: RPC_URL=\$RPC_ETH ... --fork-url \$RPC_URL).
+- If a relevant context token or candidate env key exists, do not emit placeholders like YOUR_*.
+- Preserve the exact task semantics from the user request. Do not replace the requested operation with a nearby but different command.
+- Keep concrete entities unchanged when present: tool name, path, contract/test/function name, chain, block number, host/port, and git message text.
+- Output must be one complete executable command line with balanced quotes/brackets (no truncation).
 Runtime context:
 $runtime_context
 Context source: $context_source_label ($context_status)

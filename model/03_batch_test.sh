@@ -6,13 +6,13 @@ OUTPUT_FILE=""
 CASES_FILE=""
 ROOT_DIR="/Users/z/Documents/dev/ollama-cli-assistant"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-DEFAULT_CASES_FILE="$ROOT_DIR/04_cases_holdout.txt"
+DEFAULT_CASES_FILE="$ROOT_DIR/model/04_cases_holdout.txt"
 CONTEXT_PREFIX="${CONTEXT_PREFIX:-Runtime: macOS (Darwin), shell zsh. Return one executable command only. User request: }"
 
 usage() {
   echo "Usage: $0 [-m MODEL] [-o OUTPUT_FILE] [-c CASES_FILE]"
   echo "  -m, --model      model name (default: cli-assistant)"
-  echo "  -o, --output     output file path (default: $ROOT_DIR/batch_results_YYYYmmdd_HHMMSS.txt)"
+  echo "  -o, --output     output file path (default: $ROOT_DIR/model/batch_results_YYYYmmdd_HHMMSS.txt)"
   echo "  -c, --cases      text file with one prompt per line"
   echo "Default cases file: $DEFAULT_CASES_FILE"
 }
@@ -86,7 +86,7 @@ if [[ ${#PROMPTS[@]} -eq 0 ]]; then
 fi
 
 if [[ -z "$OUTPUT_FILE" ]]; then
-  OUTPUT_FILE="$ROOT_DIR/batch_results_$(date +%Y%m%d_%H%M%S).txt"
+  OUTPUT_FILE="$ROOT_DIR/model/batch_results_$(date +%Y%m%d_%H%M%S).txt"
 fi
 
 strip_ansi() {

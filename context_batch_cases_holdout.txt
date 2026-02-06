@@ -1,0 +1,166 @@
+# Holdout stress cases (>=100). One prompt per line.
+# Foundry / Anvil / Cast
+使用 "$RPC_ETH" 作为 eth mainnet rpc ||| 使用 anvil fork 主网到区块 19123456，监听 127.0.0.1:8545
+使用 "$RPC_ETH" 作为 eth mainnet rpc ||| 使用 anvil fork 主网区块 18000000，host 0.0.0.0，端口 9545
+使用 "$RPC_ETH" 作为 eth mainnet rpc ||| 先检查 anvil 是否安装，再 fork 主网区块 17000000
+如果缺少 RPC 参数，给我 anvil 的帮助命令
+运行 test/Bridge.t.sol 里的 test_Deposit 并显示最详细 trace
+只跑 test/Router.t.sol 中名字包含 swap 的测试
+只跑 VaultTest 合约中的 test_Rebalance
+仅运行 invariant 测试并打印详细追踪
+对 OracleTest 跑 20000 次 fuzz
+对 CounterTest 跑 50000 次 fuzz 并输出 gas report
+清理 foundry 缓存后重新编译并显示合约尺寸
+生成 gas snapshot
+生成 gas snapshot 并和历史快照对比
+只编译不运行测试，显示合约大小
+运行所有测试并显示详细日志
+只运行名字以 testFail 开头的测试
+只运行 test/Permit2.t.sol 文件中的测试
+使用 "$PRIVATE_KEY" 作为私钥 ||| 运行 Deploy 脚本，模拟执行，不广播
+使用 "$RPC_SEPOLIA" 作为 sepolia rpc；使用 "$PRIVATE_KEY" 作为私钥 ||| 广播 script/Deploy.s.sol:Deploy 到 sepolia
+使用 "$RPC_SEPOLIA" 作为 sepolia rpc；使用 "$PRIVATE_KEY" 作为私钥；使用 "$ETHERSCAN_API_KEY" 作为 etherscan api key ||| 广播 script/DeployCore.s.sol:DeployCore 到 sepolia 并自动 verify
+使用 "$RPC_ETH" 作为 eth mainnet rpc ||| 用 forge script 执行 script/Migrate.s.sol:Run，并开启详细日志
+使用 "$RPC_ETH" 作为 eth mainnet rpc；使用 "$ETHERSCAN_API_KEY" 作为 etherscan api key ||| 验证主网合约，构造参数是(address,uint256)
+使用 "$RPC_SEPOLIA" 作为 sepolia rpc；使用 "$ETHERSCAN_API_KEY" 作为 etherscan api key ||| 验证 sepolia 合约并等待结果
+使用 "$RPC_ETH" 作为 eth mainnet rpc ||| 查询 USDC 在某地址余额，区块 19500000
+使用 "$RPC_ETH" 作为 eth mainnet rpc ||| 查询 WETH 在某地址余额
+使用 "$RPC_ETH" 作为 eth mainnet rpc ||| 调用 ERC20 totalSupply
+使用 "$RPC_ETH" 作为 eth mainnet rpc ||| 读取合约 storage slot 7
+使用 "$RPC_ETH" 作为 eth mainnet rpc ||| 读取合约 storage slot 0x10
+使用 "$RPC_ETH" 作为 eth mainnet rpc；使用 "$PRIVATE_KEY" 作为私钥 ||| 发送 approve 给 spender，数量 1e18
+使用 "$RPC_ETH" 作为 eth mainnet rpc；使用 "$PRIVATE_KEY" 作为私钥 ||| 发送 transfer 给目标地址，数量 2500000
+使用 "$RPC_ETH" 作为 eth mainnet rpc ||| 估算某交易的 gas
+使用 "$RPC_ETH" 作为 eth mainnet rpc ||| 查询当前区块号
+使用 "$RPC_ETH" 作为 eth mainnet rpc ||| 查询某交易 hash 的 receipt
+把 1 ether 转成 wei
+把 1000000000000000000 wei 转成 ether
+ABI 编码 constructor(address,uint256)
+ABI 编码函数 transfer(address,uint256) 参数
+解码 calldata 为 transfer(address,uint256)
+检查 forge 是否安装
+检查 cast 是否安装
+检查 anvil 是否安装
+请解释怎么只跑某个测试，但你只输出命令
+请给出命令：仅运行 BridgeTest.test_Deposit
+使用 "$RPC_ETH" 作为 eth mainnet rpc ||| 给我命令：fork 主网并在 8654 端口启动
+使用 "$RPC_ETH" 作为 eth mainnet rpc ||| 把主网 fork 到 17500000 并绑定 127.0.0.1:8654
+使用 "$RPC_ETH" 作为 eth mainnet rpc ||| 把主网 fork 到最新区块
+使用本地 rpc http://127.0.0.1:8545 跑 test/AMM.t.sol
+使用 "$RPC_ETH" 作为 eth mainnet rpc ||| 只用一个命令，先检查 anvil 再启动 fork
+
+# macOS filesystem / search
+查看当前目录所有文件含隐藏文件
+查看当前目录绝对路径
+列出当前目录下所有 .md 文件
+递归查找当前目录的 .sol 文件
+递归查找文件名包含 config 的文件
+在当前目录递归搜索字符串 delegatecall 并显示行号
+在 src 目录里查找 TODO
+在 test 目录里查找 invariant_
+只找 test 目录下 .t.sol 文件
+查找最近 24 小时修改过的文件
+统计当前目录文件数量
+显示当前目录占用大小
+显示当前目录每个子目录大小并按体积排序
+查找大于 100MB 的文件
+把 Downloads 里所有 .zip 列出来
+把当前目录按修改时间倒序列出
+查找文件名包含 空格 的文件
+把文本 hello 追加到 notes.txt
+创建目录 tmp/logs
+复制 a.txt 到 backup/a.txt
+把 old.log 移动到 archive/old.log
+删除当前目录所有 .log 文件
+安全删除 file.txt（交互确认）
+
+# macOS process / system
+查看 3000 端口是谁占用
+查看 8545 端口是否被监听
+查看名为 anvil 的进程
+结束名为 node 的进程
+查看 CPU 占用前 10 的进程
+查看内存占用前 10 的进程
+实时查看系统负载
+查看机器架构
+查看 macOS 版本
+查看当前 shell
+查看环境变量 PATH
+查看磁盘空间
+查看内存信息
+查看电池信息
+查看当前登录用户
+查看系统时间
+把当前时间格式化为 yyyy-mm-dd hh:mm:ss
+查看本机 IP 地址
+查看公网 IP
+查看 DNS 配置
+刷新 mDNS 缓存
+
+# macOS networking / http
+测试到 8.8.8.8 的连通性
+测试 github.com 的 443 端口连通性
+下载 https://example.com 到本地 example.html
+请求 https://api.github.com 并显示响应头
+用 curl 发送 JSON POST 到 https://httpbin.org/post
+跟随重定向访问一个 URL
+查看某 URL 的 TLS 证书信息
+
+# macOS git common
+查看 git 状态
+查看最近 5 次提交
+查看当前分支名
+创建并切换到分支 feature/test
+把所有修改加入暂存区
+提交信息为 update scripts
+查看某文件在最近一次提交里的改动
+比较工作区与暂存区差异
+比较当前分支与 main 的差异文件列表
+拉取远程最新代码
+推送当前分支到 origin
+
+# macOS dev tools
+查看 node 版本
+查看 npm 版本
+安装项目依赖
+运行 npm test
+运行 npm run build
+运行 python3 脚本 app.py
+创建并激活 python 虚拟环境
+安装 requirements.txt 依赖
+查看 pip 已安装包
+
+# macOS archive / text / clipboard
+把 folder 打包成 folder.tar.gz
+解压 archive.tar.gz 到当前目录
+解压 test.zip 到 out 目录
+计算 file.bin 的 sha256
+计算两个文件差异并按统一格式输出
+显示文件前 20 行
+显示文件最后 50 行
+按行号查看第 120 行
+统计文件行数
+去重并排序 words.txt
+从 access.log 中筛选包含 ERROR 的行
+把命令输出复制到剪贴板
+读取剪贴板内容
+
+# macOS open / spotlight / defaults
+用默认应用打开当前目录
+用浏览器打开 https://etherscan.io
+在 Finder 中显示当前目录
+用 Spotlight 查找名字包含 anvil 的文件
+查找 app 名称为 Visual Studio Code
+读取 Finder 是否显示隐藏文件
+设置 Finder 显示隐藏文件
+重启 Finder
+
+# mixed edge cases
+请解释如何查看端口占用，但只输出命令
+如果参数不够，请给我最相关的帮助命令
+只输出一个命令，不要任何解释：查找当前目录所有 JSON 文件
+给我一条命令：在当前目录查找并替换 foo 为 bar
+给我命令：查看最近 100 行日志并实时跟随
+使用 "$RPC_ETH" 作为 eth mainnet rpc ||| 只给命令：把主网 fork 到 19050000 并跑 test/Lending.t.sol 的 test_Borrow
+使用 "$APIKEY_DEEPSEEK" 作为 deepseek 的 API key ||| 调用 deepseek 的 chat 接口，使用 curl 发一个最小请求示例
+使用 "$RPC_SEPOLIA" 作为 sepolia rpc；使用 "$ETHERSCAN_API_KEY" 作为 etherscan api key ||| 广播 script/DeployCore.s.sol:DeployCore 到 sepolia 并自动 verify

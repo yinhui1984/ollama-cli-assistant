@@ -6,18 +6,39 @@ ASSISTANT_SCRIPT="$SCRIPT_DIR/cli-assistant.sh"
 MODEL="cli-assistant"
 OUTPUT_FILE=""
 PRINT_FINAL_PROMPT=1
+CASES_FILE="$SCRIPT_DIR/context_batch_cases_holdout.txt"
+
+CASE_PROMPTS=()
+CASE_CONTEXTS=()
 
 usage() {
   cat <<'USAGE'
 Usage:
-  context_batch_test.sh [-m MODEL] [-o OUTPUT_FILE] [--no-print-final-prompt]
+  context_batch_test.sh [-m MODEL] [-o OUTPUT_FILE] [--cases FILE] [--no-print-final-prompt]
+
+Cases format (one case per line):
+  1) prompt
+  2) context ||| prompt
+
+Rules:
+  - Blank lines and lines starting with # are ignored.
+  - If a case has context (format #2), script injects it with --context.
+  - Context cases are run with an empty --context-file to avoid default file interference.
 
 Options:
   -m, --model MODEL          Model name (default: cli-assistant)
   -o, --output FILE          Output report path
+  --cases FILE               Cases file path (default: ./context_batch_cases_holdout.txt)
   --no-print-final-prompt    Do not pass --print-final-prompt to cli-assistant.sh
   -h, --help                 Show this help
 USAGE
+}
+
+trim() {
+  local s="$1"
+  s="${s#"${s%%[![:space:]]*}"}"
+  s="${s%"${s##*[![:space:]]}"}"
+  printf '%s' "$s"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -30,6 +51,11 @@ while [[ $# -gt 0 ]]; do
     -o|--output)
       [[ $# -ge 2 ]] || { echo "Error: --output needs a value." >&2; exit 1; }
       OUTPUT_FILE="$2"
+      shift 2
+      ;;
+    --cases)
+      [[ $# -ge 2 ]] || { echo "Error: --cases needs a value." >&2; exit 1; }
+      CASES_FILE="$2"
       shift 2
       ;;
     --no-print-final-prompt)
@@ -53,6 +79,11 @@ if [[ ! -x "$ASSISTANT_SCRIPT" ]]; then
   exit 1
 fi
 
+if [[ ! -f "$CASES_FILE" ]]; then
+  echo "Error: cases file not found: $CASES_FILE" >&2
+  exit 1
+fi
+
 if [[ -z "$OUTPUT_FILE" ]]; then
   OUTPUT_FILE="$SCRIPT_DIR/context_batch_results_$(date +%Y%m%d_%H%M%S).txt"
 fi
@@ -63,20 +94,35 @@ trap 'rm -rf "$TMPDIR_ROOT"' EXIT
 EMPTY_CONTEXT_FILE="$TMPDIR_ROOT/empty_context.md"
 touch "$EMPTY_CONTEXT_FILE"
 
-FILE_CONTEXT_ETH="$TMPDIR_ROOT/context_eth.md"
-cat > "$FILE_CONTEXT_ETH" <<'EOF'
-- 使用 "$RPC_ETH" 作为 eth mainnet rpc
-- 使用 "$APIKEY_DEEPSEEK" 作为 deepseek 的 API key
-EOF
+load_cases() {
+  local raw_line
+  local line
+  local prompt
+  local context
 
-FILE_CONTEXT_BSC="$TMPDIR_ROOT/context_bsc.md"
-cat > "$FILE_CONTEXT_BSC" <<'EOF'
-- 使用 "$RPC_BSC" 作为 eth mainnet rpc
-EOF
+  while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
+    line="$(trim "$raw_line")"
+    [[ -z "$line" ]] && continue
+    [[ "$line" == \#* ]] && continue
 
-INLINE_CONTEXT_ETH='- 使用 "$RPC_ETH" 作为 eth mainnet rpc'
-INLINE_CONTEXT_DEEPSEEK='- 使用 "$APIKEY_DEEPSEEK" 作为 deepseek 的 API key'
-INLINE_CONTEXT_CONFLICT='- 使用 "$RPC_ETH" 作为 eth mainnet rpc'
+    if [[ "$line" == *"|||"* ]]; then
+      context="$(trim "${line%%|||*}")"
+      prompt="$(trim "${line#*|||}")"
+    else
+      context=""
+      prompt="$line"
+    fi
+
+    [[ -z "$prompt" ]] && continue
+    CASE_PROMPTS+=("$prompt")
+    CASE_CONTEXTS+=("$context")
+  done < "$CASES_FILE"
+
+  if [[ ${#CASE_PROMPTS[@]} -eq 0 ]]; then
+    echo "Error: no runnable cases found in $CASES_FILE" >&2
+    exit 1
+  fi
+}
 
 append_header() {
   {
@@ -84,10 +130,12 @@ append_header() {
     echo "Time: $(date '+%Y-%m-%d %H:%M:%S')"
     echo "Model: $MODEL"
     echo "Assistant Script: $ASSISTANT_SCRIPT"
+    echo "Cases File: $CASES_FILE"
+    echo "Cases: ${#CASE_PROMPTS[@]}"
     echo "Output File: $OUTPUT_FILE"
     echo
     echo "Env probe:"
-    for var_name in RPC_ETH RPC_BSC APIKEY_DEEPSEEK; do
+    for var_name in RPC_ETH RPC_BSC APIKEY_DEEPSEEK RPC_SEPOLIA ETHERSCAN_API_KEY; do
       if [[ "${!var_name+x}" == "x" ]]; then
         echo "  $var_name=SET"
       else
@@ -99,20 +147,27 @@ append_header() {
 }
 
 run_case() {
-  local case_name="$1"
+  local case_num="$1"
   local prompt="$2"
-  shift 2
+  local context="$3"
   local -a cmd=("$ASSISTANT_SCRIPT" "-m" "$MODEL")
   local stdout_file
   local stderr_file
   local rc
+  local cmd_text
+  local context_label
 
   if [[ "$PRINT_FINAL_PROMPT" -eq 1 ]]; then
     cmd+=("--print-final-prompt")
   fi
-  if [[ $# -gt 0 ]]; then
-    cmd+=("$@")
+
+  if [[ -n "${context//[[:space:]]/}" ]]; then
+    cmd+=("--context-file" "$EMPTY_CONTEXT_FILE" "--context" "$context")
+    context_label="$context"
+  else
+    context_label="<none>"
   fi
+
   cmd+=("$prompt")
 
   stdout_file="$(mktemp)"
@@ -123,10 +178,13 @@ run_case() {
   rc=$?
   set -e
 
+  cmd_text="${cmd[*]}"
+
   {
-    echo "=== CASE: $case_name ==="
+    printf '=== CASE %03d ===\n' "$case_num"
     echo "PROMPT: $prompt"
-    echo "CMD: ${cmd[*]}"
+    echo "CONTEXT: $context_label"
+    echo "CMD: $cmd_text"
     echo "EXIT_CODE: $rc"
     echo "--- STDERR ---"
     cat "$stderr_file"
@@ -138,38 +196,11 @@ run_case() {
   rm -f "$stdout_file" "$stderr_file"
 }
 
+load_cases
 append_header
 
-run_case \
-  "default_context_file" \
-  "fork eth主网 区块 17000000"
-
-run_case \
-  "inline_only_eth" \
-  "fork eth主网 区块 17000000" \
-  --context-file "$EMPTY_CONTEXT_FILE" \
-  --context "$INLINE_CONTEXT_ETH"
-
-run_case \
-  "context_file_only_eth" \
-  "fork eth主网 区块 17000000" \
-  --context-file "$FILE_CONTEXT_ETH"
-
-run_case \
-  "context_file_plus_inline_conflict" \
-  "fork eth主网 区块 17000000" \
-  --context-file "$FILE_CONTEXT_BSC" \
-  --context "$INLINE_CONTEXT_CONFLICT"
-
-run_case \
-  "inline_only_deepseek" \
-  "调用 deepseek 的 chat 接口，使用 curl 发一个最小请求示例" \
-  --context-file "$EMPTY_CONTEXT_FILE" \
-  --context "$INLINE_CONTEXT_DEEPSEEK"
-
-run_case \
-  "empty_context_file_no_inline" \
-  "fork eth主网 区块 17000000" \
-  --context-file "$EMPTY_CONTEXT_FILE"
+for i in "${!CASE_PROMPTS[@]}"; do
+  run_case "$((i + 1))" "${CASE_PROMPTS[$i]}" "${CASE_CONTEXTS[$i]}"
+done
 
 echo "Saved results: $OUTPUT_FILE"

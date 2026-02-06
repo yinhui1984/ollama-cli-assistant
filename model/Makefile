@@ -1,8 +1,8 @@
 MODEL ?= cli-assistant
 ROOT := /Users/z/Documents/dev/ollama-cli-assistant
-MODEFILE := $(ROOT)/ollama-cli-assistant.Modelfile
-BATCH_SCRIPT := $(ROOT)/03_batch_test.sh
-CLEAN_SCRIPT := $(ROOT)/02_clean_model.sh
+MODEFILE := $(ROOT)/model/ollama-cli-assistant.Modelfile
+BATCH_SCRIPT := $(ROOT)/model/03_batch_test.sh
+CLEAN_SCRIPT := $(ROOT)/model/02_clean_model.sh
 
 .PHONY: help create batch batch-cases clean-model recreate
 
@@ -25,7 +25,7 @@ batch:
 
 batch-cases:
 	@if [ -z "$(CASES)" ]; then \
-		echo "Error: CASES is required. Example: make batch-cases CASES=$(ROOT)/04_cases_holdout.txt"; \
+		echo "Error: CASES is required. Example: make batch-cases CASES=$(ROOT)/model/04_cases_holdout.txt"; \
 		exit 1; \
 	fi
 	$(BATCH_SCRIPT) -m $(MODEL) -c $(CASES)
