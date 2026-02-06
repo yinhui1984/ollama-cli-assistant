@@ -53,6 +53,22 @@ debug_log() {
   fi
 }
 
+copy_to_clipboard() {
+  local text="$1"
+  if command -v pbcopy >/dev/null 2>&1; then
+    printf '%s' "$text" | pbcopy
+    return $?
+  fi
+  return 1
+}
+
+show_copied_notice() {
+  # Keep stdout clean (for piping). Show notice only in interactive terminal.
+  if [[ -t 1 && -t 2 ]]; then
+    printf '\033[32m已复制\033[0m\n' >&2
+  fi
+}
+
 require_ollama() {
   if ! command -v ollama >/dev/null 2>&1; then
     echo "Error: ollama command not found." >&2
@@ -239,6 +255,7 @@ run_once() {
   local ttft_ms="N/A"
   local stream_enabled=0
   local stream_started=0
+  local streamed_output=""
 
   t_start="$(now_ms)"
   runtime_context="$(build_runtime_context)"
@@ -359,13 +376,18 @@ User request: $prompt"
       if [[ "$ch" == $'\r' || "$ch" == $'\n' ]]; then
         if [[ "$stream_started" -eq 1 ]]; then
           printf ' '
+          streamed_output+=" "
         fi
       else
         printf '%s' "$ch"
+        streamed_output+="$ch"
         stream_started=1
       fi
     done < <(ollama run "$MODEL" "$full_prompt")
     printf '\n'
+    if copy_to_clipboard "$streamed_output"; then
+      show_copied_notice
+    fi
     return
   fi
 
@@ -405,6 +427,9 @@ User request: $prompt"
   fi
 
   printf '%s\n' "$sanitized_output"
+  if copy_to_clipboard "$sanitized_output"; then
+    show_copied_notice
+  fi
 }
 
 args=()
