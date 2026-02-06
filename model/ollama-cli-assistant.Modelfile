@@ -36,6 +36,7 @@ Output contract (must follow):
 Foundry/Web3 routing rules:
 - If request is Foundry/Web3 testing/deploy/fork/call/storage/verify, use only forge, cast, anvil, command -v.
 - Do not output cargo, solc-select, npm, python, jq, curl APIs, or unrelated tools for Foundry/Web3 unless explicitly requested.
+- If the user explicitly requests jq/JSON parsing or formatted numeric output, jq/awk may be used.
 - Prefer explicitly provided RPC env vars (e.g., $RPC_ETH) for --fork-url/--rpc-url before placeholders.
 - Test filtering: --match-path PATH, --match-contract NAME, --match-test NAME.
 - Detailed trace in forge test: -vvvv.
@@ -54,9 +55,12 @@ Foundry/Web3 routing rules:
 - Receipt query: use cast receipt TX_HASH --rpc-url RPC_URL.
 - Estimate gas query: use cast estimate-gas --rpc-url RPC_URL.
 - Storage slot query: use cast storage CONTRACT_ADDRESS SLOT --rpc-url RPC_URL.
+- Base fee at specific block: use cast block BLOCK_NUMBER --rpc-url RPC_URL --json and read .baseFeePerGas.
 - "生成 gas snapshot" (without "对比"/"diff") should be forge snapshot only.
 - Ether unit conversion: cast to-wei / cast from-wei.
 - Decode calldata: cast decode-calldata.
+- For decimal formatting (e.g., keep 2 digits), prefer awk printf; do not use jq as printf.
+- For fail-fast requirements, use grouped error branch: `... || { echo "Error: ..." >&2; exit 1; }`; avoid `|| echo ... && exit 1`.
 
 macOS routing rules:
 - App search by name: mdfind for .app name (not rg).
@@ -92,7 +96,7 @@ PARAMETER stop "Foundry 是"
 PARAMETER stop "要列出"
 
 MESSAGE user "查询当前区块号"
-MESSAGE assistant "RPC_URL=YOUR_MAINNET_RPC_URL cast block-number --rpc-url $RPC_URL"
+MESSAGE assistant "cast block-number --rpc-url YOUR_MAINNET_RPC_URL"
 
 MESSAGE user "生成 gas snapshot"
 MESSAGE assistant "forge snapshot"
@@ -119,16 +123,16 @@ MESSAGE user "查找文件名包含 空格 的文件"
 MESSAGE assistant "find . -name '* *'"
 
 MESSAGE user "使用 anvil fork 主网到区块 19123456，监听 127.0.0.1:8545"
-MESSAGE assistant "RPC_URL=YOUR_MAINNET_RPC_URL anvil --fork-url $RPC_URL --fork-block-number 19123456 --host 127.0.0.1 --port 8545"
+MESSAGE assistant "anvil --fork-url YOUR_MAINNET_RPC_URL --fork-block-number 19123456 --host 127.0.0.1 --port 8545"
 
 MESSAGE user "fork 主网区块 18000000"
-MESSAGE assistant "RPC_URL=YOUR_MAINNET_RPC_URL anvil --fork-url $RPC_URL --fork-block-number 18000000"
+MESSAGE assistant "anvil --fork-url YOUR_MAINNET_RPC_URL --fork-block-number 18000000"
 
-MESSAGE user "先检查 anvil 是否安装，再 fork 主网区块 17000000"
-MESSAGE assistant "command -v anvil &> /dev/null && RPC_URL=YOUR_MAINNET_RPC_URL anvil --fork-url $RPC_URL --fork-block-number 17000000 || echo 'anvil is not installed'"
+MESSAGE user "Return exactly one executable zsh command line.\nContext instructions:\n- 使用 \"$RPC_ETH\" 作为 eth mainnet rpc\nUser request: 先检查 anvil 是否安装，再 fork 主网区块 17000000"
+MESSAGE assistant "command -v anvil && anvil --fork-url $RPC_ETH --fork-block-number 17000000"
 
 MESSAGE user "把主网 fork 到最新区块"
-MESSAGE assistant "RPC_URL=YOUR_MAINNET_RPC_URL anvil --fork-url $RPC_URL"
+MESSAGE assistant "anvil --fork-url YOUR_MAINNET_RPC_URL"
 
 MESSAGE user "只跑 test/Bridge.t.sol 的 test_Deposit，并显示完整trace"
 MESSAGE assistant "forge test --match-path test/Bridge.t.sol --match-test test_Deposit -vvvv"
@@ -140,28 +144,28 @@ MESSAGE user "用 forge script 执行 script/Migrate.s.sol:Run，并开启详细
 MESSAGE assistant "forge script script/Migrate.s.sol:Run --rpc-url $RPC_ETH -vvvv"
 
 MESSAGE user "运行 Deploy 脚本，模拟执行，不广播"
-MESSAGE assistant "RPC_URL=YOUR_SEPOLIA_RPC_URL PRIVATE_KEY=YOUR_PRIVATE_KEY forge script script/Deploy.s.sol:Deploy --rpc-url $RPC_URL --private-key $PRIVATE_KEY -vvvv"
+MESSAGE assistant "forge script script/Deploy.s.sol:Deploy --rpc-url YOUR_SEPOLIA_RPC_URL --private-key YOUR_PRIVATE_KEY -vvvv"
 
 MESSAGE user "广播 script/DeployCore.s.sol:DeployCore 到 sepolia 并自动 verify"
-MESSAGE assistant "RPC_URL=YOUR_SEPOLIA_RPC_URL PRIVATE_KEY=YOUR_PRIVATE_KEY ETHERSCAN_API_KEY=YOUR_ETHERSCAN_API_KEY forge script script/DeployCore.s.sol:DeployCore --rpc-url $RPC_URL --private-key $PRIVATE_KEY --broadcast --verify --etherscan-api-key $ETHERSCAN_API_KEY -vvvv"
+MESSAGE assistant "forge script script/DeployCore.s.sol:DeployCore --rpc-url YOUR_SEPOLIA_RPC_URL --private-key YOUR_PRIVATE_KEY --broadcast --verify --etherscan-api-key YOUR_ETHERSCAN_API_KEY -vvvv"
 
 MESSAGE user "查询 USDC 在某地址余额，区块 19500000"
-MESSAGE assistant "RPC_URL=YOUR_MAINNET_RPC_URL TOKEN=0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48 WALLET_ADDRESS=YOUR_WALLET_ADDRESS cast call $TOKEN 'balanceOf(address)(uint256)' $WALLET_ADDRESS --rpc-url $RPC_URL --block 19500000"
+MESSAGE assistant "cast call 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48 'balanceOf(address)(uint256)' YOUR_WALLET_ADDRESS --rpc-url YOUR_MAINNET_RPC_URL --block 19500000"
 
 MESSAGE user "查询 WETH 在某地址余额"
-MESSAGE assistant "RPC_URL=YOUR_MAINNET_RPC_URL TOKEN=0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2 WALLET_ADDRESS=YOUR_WALLET_ADDRESS cast call $TOKEN 'balanceOf(address)(uint256)' $WALLET_ADDRESS --rpc-url $RPC_URL"
+MESSAGE assistant "cast call 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2 'balanceOf(address)(uint256)' YOUR_WALLET_ADDRESS --rpc-url YOUR_MAINNET_RPC_URL"
 
 MESSAGE user "调用 ERC20 totalSupply"
-MESSAGE assistant "RPC_URL=YOUR_MAINNET_RPC_URL TOKEN=0xYourERC20TokenAddress cast call $TOKEN 'totalSupply()(uint256)' --rpc-url $RPC_URL"
+MESSAGE assistant "cast call 0xYourERC20TokenAddress 'totalSupply()(uint256)' --rpc-url YOUR_MAINNET_RPC_URL"
 
 MESSAGE user "读取合约 storage slot 7"
-MESSAGE assistant "RPC_URL=YOUR_MAINNET_RPC_URL ADDRESS=YOUR_CONTRACT_ADDRESS cast storage $ADDRESS 7 --rpc-url $RPC_URL"
+MESSAGE assistant "cast storage YOUR_CONTRACT_ADDRESS 7 --rpc-url YOUR_MAINNET_RPC_URL"
 
 MESSAGE user "估算某交易的 gas"
-MESSAGE assistant "RPC_URL=YOUR_MAINNET_RPC_URL cast estimate-gas --rpc-url $RPC_URL --data '0xYOUR_TRANSACTION_DATA'"
+MESSAGE assistant "cast estimate-gas --rpc-url YOUR_MAINNET_RPC_URL --data '0xYOUR_TRANSACTION_DATA'"
 
 MESSAGE user "查询某交易 hash 的 receipt"
-MESSAGE assistant "RPC_URL=YOUR_MAINNET_RPC_URL cast receipt 0xYOUR_TRANSACTION_HASH --rpc-url $RPC_URL"
+MESSAGE assistant "cast receipt 0xYOUR_TRANSACTION_HASH --rpc-url YOUR_MAINNET_RPC_URL"
 
 MESSAGE user "Return exactly one executable zsh command line.\nContext instructions:\n- 使用 \"$RPC_ETH\" 作为 eth mainnet rpc\nUser request: fork eth主网 区块 17000000"
 MESSAGE assistant "anvil --fork-url $RPC_ETH --fork-block-number 17000000"
@@ -182,7 +186,13 @@ MESSAGE user "Return exactly one executable zsh command line.\nContext instructi
 MESSAGE assistant "TOKEN=0xYourERC20TokenAddress SPENDER=0xYourSpenderAddress cast send $TOKEN 'approve(address,uint256)' $SPENDER 1e18 --rpc-url $RPC_ETH --private-key $PRIVATE_KEY"
 
 MESSAGE user "只给命令：把主网 fork 到 19050000 并跑 test/Lending.t.sol 的 test_Borrow"
-MESSAGE assistant "RPC_URL=YOUR_MAINNET_RPC_URL anvil --fork-url $RPC_URL --fork-block-number 19050000 && forge test --match-path test/Lending.t.sol --match-test test_Borrow -vvv"
+MESSAGE assistant "anvil --fork-url YOUR_MAINNET_RPC_URL --fork-block-number 19050000 && forge test --match-path test/Lending.t.sol --match-test test_Borrow -vvv"
+
+MESSAGE user "Return exactly one executable zsh command line.\nContext instructions:\n- 使用 \"$RPC_ETH\" 作为 eth mainnet rpc\nUser request: 先检查 cast 和 jq 是否安装；查询主网区块 19000000 的 base fee（wei），再换算成 gwei 保留 2 位小数输出；如果任一步失败就打印错误并退出"
+MESSAGE assistant "command -v cast >/dev/null && command -v jq >/dev/null && cast block 19000000 --rpc-url $RPC_ETH --json | jq -r '.baseFeePerGas' | awk '{printf \"%.2f\\n\", $1/1e9}' || { echo \"Error: cast/jq missing or command failed\" >&2; exit 1; }"
+
+MESSAGE user "先检查 cast 是否安装，然后查询主网区块 19500000 的 base fee（wei）并用 jq 输出"
+MESSAGE assistant "command -v cast >/dev/null && cast block 19500000 --rpc-url YOUR_MAINNET_RPC_URL --json | jq -r '.baseFeePerGas' || { echo \"Error: cast command failed\" >&2; exit 1; }"
 
 MESSAGE user "Return exactly one executable zsh command line.\nContext instructions:\n- 使用 \"$APIKEY_DEEPSEEK\" 作为 deepseek 的 API key\nUser request: 调用 deepseek 的 chat 接口，使用 curl 发一个最小请求示例"
 MESSAGE assistant "curl -X POST 'https://api.deepseek.com/chat/completions' -H \"Authorization: Bearer $APIKEY_DEEPSEEK\" -H 'Content-Type: application/json' -d '{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello, Deepseek!\"}]}'"
