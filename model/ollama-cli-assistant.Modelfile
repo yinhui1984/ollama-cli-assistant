@@ -45,6 +45,8 @@ Foundry/Web3 routing rules:
 - Script simulation: do not include --broadcast.
 - Script broadcast: include --broadcast.
 - Script verify: include --verify and --etherscan-api-key.
+- For "只编译不运行测试，显示合约大小", prefer forge build --sizes.
+- For forge script execution without broadcast intent, do not add --broadcast or --script-legacy unless explicitly requested.
 - Fork latest block: use anvil --fork-url only (no --fork-block-number latest).
 - Current block number: cast block-number --rpc-url RPC_URL.
 - ERC20 balance query: use cast call TOKEN 'balanceOf(address)(uint256)' WALLET --rpc-url RPC_URL.
@@ -137,8 +139,14 @@ MESSAGE assistant "RPC_URL=YOUR_MAINNET_RPC_URL cast block-number --rpc-url $RPC
 MESSAGE user "生成 gas snapshot"
 MESSAGE assistant "forge snapshot"
 
+MESSAGE user "只编译不运行测试，显示合约大小"
+MESSAGE assistant "forge build --sizes"
+
 MESSAGE user "解码 calldata 为 transfer(address,uint256)"
 MESSAGE assistant "cast decode-calldata 'transfer(address,uint256)' 0xYOUR_CALLDATA"
+
+MESSAGE user "统计当前目录文件数量"
+MESSAGE assistant "ls -1 | wc -l"
 
 MESSAGE user "统计文件行数"
 MESSAGE assistant "wc -l *"
@@ -154,6 +162,12 @@ MESSAGE assistant "find . -type f -exec sed -i '' 's/foo/bar/g' {} +"
 
 MESSAGE user "提交信息为 update scripts"
 MESSAGE assistant "git commit -m \"update scripts\""
+
+MESSAGE user "检查 forge 是否安装"
+MESSAGE assistant "command -v forge &> /dev/null"
+
+MESSAGE user "查找文件名包含 空格 的文件"
+MESSAGE assistant "find . -name '* *'"
 
 MESSAGE user "使用 anvil fork 主网到区块 19123456，监听 127.0.0.1:8545"
 MESSAGE assistant "RPC_URL=YOUR_MAINNET_RPC_URL anvil --fork-url $RPC_URL --fork-block-number 19123456 --host 127.0.0.1 --port 8545"
@@ -172,6 +186,9 @@ MESSAGE assistant "forge test --match-path test/Bridge.t.sol --match-test test_D
 
 MESSAGE user "对 CounterTest 跑 50000 次 fuzz，并输出 gas report"
 MESSAGE assistant "forge test --match-contract CounterTest --fuzz-runs 50000 --gas-report -vvv"
+
+MESSAGE user "用 forge script 执行 script/Migrate.s.sol:Run，并开启详细日志"
+MESSAGE assistant "forge script script/Migrate.s.sol:Run --rpc-url $RPC_ETH -vvvv"
 
 MESSAGE user "运行 Deploy 脚本，模拟执行，不广播"
 MESSAGE assistant "RPC_URL=YOUR_SEPOLIA_RPC_URL PRIVATE_KEY=YOUR_PRIVATE_KEY forge script script/Deploy.s.sol:Deploy --rpc-url $RPC_URL --private-key $PRIVATE_KEY -vvvv"
@@ -211,6 +228,12 @@ MESSAGE assistant "ADDRESS=YOUR_CONTRACT_ADDRESS cast storage $ADDRESS 7 --rpc-u
 
 MESSAGE user "Return exactly one executable zsh command line.\nContext instructions:\n- 使用 \"$RPC_ETH\" 作为 eth mainnet rpc\nUser request: 查询某交易 hash 的 receipt"
 MESSAGE assistant "cast receipt 0xYOUR_TRANSACTION_HASH --rpc-url $RPC_ETH"
+
+MESSAGE user "Return exactly one executable zsh command line.\nContext instructions:\n- 使用 \"$RPC_ETH\" 作为 eth mainnet rpc\n- 使用 \"$PRIVATE_KEY\" 作为私钥\nUser request: 发送 approve 给 spender，数量 1e18"
+MESSAGE assistant "TOKEN=0xYourERC20TokenAddress SPENDER=0xYourSpenderAddress cast send $TOKEN 'approve(address,uint256)' $SPENDER 1e18 --rpc-url $RPC_ETH --private-key $PRIVATE_KEY"
+
+MESSAGE user "只给命令：把主网 fork 到 19050000 并跑 test/Lending.t.sol 的 test_Borrow"
+MESSAGE assistant "RPC_URL=YOUR_MAINNET_RPC_URL anvil --fork-url $RPC_URL --fork-block-number 19050000 && forge test --match-path test/Lending.t.sol --match-test test_Borrow -vvv"
 
 MESSAGE user "Return exactly one executable zsh command line.\nContext instructions:\n- 使用 \"$APIKEY_DEEPSEEK\" 作为 deepseek 的 API key\nUser request: 调用 deepseek 的 chat 接口，使用 curl 发一个最小请求示例"
 MESSAGE assistant "curl -X POST 'https://api.deepseek.com/chat' -H 'Authorization: Bearer $APIKEY_DEEPSEEK' -H 'Content-Type: application/json' -d '{\"message\":\"Hello, Deepseek!\"}'"
