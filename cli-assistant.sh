@@ -3,7 +3,8 @@ set -euo pipefail
 
 MODEL="cli-assistant"
 INTERACTIVE=0
-PRINT_FINAL_PROMPT=0
+DEBUG=0
+STREAM_MODE="auto"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 CONTEXT_FILE="$SCRIPT_DIR/context.md"
 CONTEXT_FILE_EXPLICIT=0
@@ -13,7 +14,7 @@ CONTEXT_INLINE_EXPLICIT=0
 usage() {
   cat <<'USAGE'
 Usage:
-  cli-assistant.sh [-i] [-m MODEL] [--context TEXT] [--context-file FILE] [--print-final-prompt] [PROMPT...]
+  cli-assistant.sh [-i] [-m MODEL] [--context TEXT] [--context-file FILE] [--debug] [--stream|--no-stream] [PROMPT...]
 
 Modes:
   1) Interactive mode (-i)
@@ -29,9 +30,27 @@ Options:
   --context TEXT      Inline context instructions string
   -c, --context-file FILE
                       Context file path (default: <script_dir>/context.md)
-  --print-final-prompt  Print the final prompt sent to ollama (to stderr)
+  --debug             Print final prompt and timing diagnostics to stderr
+  --stream            Force streaming model output to stdout
+  --no-stream         Force buffered/sanitized single-line output
   -h, --help          Show this help
 USAGE
+}
+
+now_ms() {
+  perl -MTime::HiRes=time -e 'printf "%.3f\n", time()*1000'
+}
+
+elapsed_ms() {
+  local start_ms="$1"
+  local end_ms="$2"
+  awk -v s="$start_ms" -v e="$end_ms" 'BEGIN { printf "%.3f", (e - s) }'
+}
+
+debug_log() {
+  if [[ "$DEBUG" -eq 1 ]]; then
+    printf '[debug] %s\n' "$1" >&2
+  fi
 }
 
 require_ollama() {
@@ -125,13 +144,6 @@ EOF
   fi
 }
 
-collect_candidate_env_keys() {
-  local max_keys=80
-  local keys
-  keys="$(env | sed -E 's/=.*$//' | LC_ALL=C sort)"
-  printf '%s\n' "$keys" | grep -E '(^RPC_|^APIKEY_|_API_KEY$|_TOKEN$|^DATABASE_URL$|^DB_.*|^PRIVATE_KEY$|^ETHERSCAN_API_KEY$)' | head -n "$max_keys" || true
-}
-
 sanitize_model_output() {
   local raw_output="$1"
   local normalized
@@ -185,12 +197,10 @@ build_runtime_context() {
   local os_name
   local current_shell
   local current_cwd
-  local candidate_env_keys
 
   os_name="$(uname -s)"
   current_shell="${SHELL##*/}"
   current_cwd="$(pwd -P)"
-  candidate_env_keys="$(collect_candidate_env_keys)"
 
   cat <<EOF
 os: $os_name
@@ -199,8 +209,6 @@ current_shell: $current_shell
 cwd: $current_cwd
 script_dir: $SCRIPT_DIR
 $(collect_tool_availability)
-candidate_env_keys:
-$candidate_env_keys
 EOF
 }
 
@@ -217,8 +225,23 @@ run_once() {
   local full_prompt
   local raw_output
   local sanitized_output
+  local t_start
+  local t_runtime_done
+  local t_context_done
+  local t_prompt_done
+  local t_model_start
+  local t_first_byte=""
+  local t_model_done
+  local t_sanitize_done
+  local ch=""
+  local fifo_path=""
+  local ollama_pid
+  local ttft_ms="N/A"
+  local stream_enabled=0
 
+  t_start="$(now_ms)"
   runtime_context="$(build_runtime_context)"
+  t_runtime_done="$(now_ms)"
 
   if [[ -f "$CONTEXT_FILE" ]]; then
     file_context_text="$(cat "$CONTEXT_FILE")"
@@ -276,6 +299,7 @@ $inline_context_text"
 
   context_vars="$(extract_context_env_vars "$context_text")"
   context_var_hints="$(build_context_var_hints "$context_vars")"
+  t_context_done="$(now_ms)"
 
   full_prompt="Return exactly one executable zsh command line.
 Instruction priority:
@@ -288,10 +312,9 @@ Conflict resolution:
 Context usage rules:
 - Treat context instructions as durable user preferences and constraints.
 - If context includes explicit env var tokens (for example \$RPC_ETH), use those exact tokens verbatim when relevant.
-- If no explicit context token is provided for a required parameter, prefer an existing candidate_env_keys variable over placeholders.
 - Do not rename context-provided env vars into temporary aliases unless the user explicitly asks.
 - Prefer direct usage (for example: anvil --fork-url \$RPC_ETH) over alias chains (for example: RPC_URL=\$RPC_ETH ... --fork-url \$RPC_URL).
-- If a relevant context token or candidate env key exists, do not emit placeholders like YOUR_*.
+- If a relevant context token exists, do not emit placeholders like YOUR_*.
 - Preserve the exact task semantics from the user request. Do not replace the requested operation with a nearby but different command.
 - Keep concrete entities unchanged when present: tool name, path, contract/test/function name, chain, block number, host/port, and git message text.
 - Output must be one complete executable command line with balanced quotes/brackets (no truncation).
@@ -302,8 +325,9 @@ $context_var_hints
 Context instructions:
 $context_text
 User request: $prompt"
+  t_prompt_done="$(now_ms)"
 
-  if [[ "$PRINT_FINAL_PROMPT" -eq 1 ]]; then
+  if [[ "$DEBUG" -eq 1 ]]; then
     {
       echo "----- FINAL PROMPT BEGIN -----"
       echo "$full_prompt"
@@ -311,8 +335,62 @@ User request: $prompt"
     } >&2
   fi
 
-  raw_output="$(ollama run "$MODEL" "$full_prompt")"
+  if [[ "$DEBUG" -eq 0 ]]; then
+    case "$STREAM_MODE" in
+      on)
+        stream_enabled=1
+        ;;
+      off)
+        stream_enabled=0
+        ;;
+      auto)
+        if [[ -t 1 ]]; then
+          stream_enabled=1
+        fi
+        ;;
+    esac
+  fi
+
+  if [[ "$stream_enabled" -eq 1 ]]; then
+    ollama run "$MODEL" "$full_prompt"
+    return
+  fi
+
+  t_model_start="$(now_ms)"
+  if [[ "$DEBUG" -eq 1 ]]; then
+    fifo_path="$(mktemp -u "${TMPDIR:-/tmp}/cli-assistant.XXXXXX")"
+    mkfifo "$fifo_path"
+    ollama run "$MODEL" "$full_prompt" >"$fifo_path" 2> >(cat >&2) &
+    ollama_pid=$!
+    raw_output=""
+    while IFS= read -r -n 1 ch < "$fifo_path"; do
+      if [[ -z "$t_first_byte" ]]; then
+        t_first_byte="$(now_ms)"
+      fi
+      raw_output+="$ch"
+    done
+    wait "$ollama_pid"
+    rm -f "$fifo_path"
+  else
+    raw_output="$(ollama run "$MODEL" "$full_prompt")"
+  fi
+  t_model_done="$(now_ms)"
   sanitized_output="$(sanitize_model_output "$raw_output")"
+  t_sanitize_done="$(now_ms)"
+
+  if [[ "$DEBUG" -eq 1 ]]; then
+    if [[ -n "$t_first_byte" ]]; then
+      ttft_ms="$(elapsed_ms "$t_model_start" "$t_first_byte")"
+    fi
+    debug_log "timing.build_runtime_context_ms=$(elapsed_ms "$t_start" "$t_runtime_done")"
+    debug_log "timing.build_context_and_hints_ms=$(elapsed_ms "$t_runtime_done" "$t_context_done")"
+    debug_log "timing.build_prompt_ms=$(elapsed_ms "$t_context_done" "$t_prompt_done")"
+    debug_log "timing.model_ttft_ms=$ttft_ms"
+    debug_log "timing.model_total_ms=$(elapsed_ms "$t_model_start" "$t_model_done")"
+    debug_log "timing.sanitize_output_ms=$(elapsed_ms "$t_model_done" "$t_sanitize_done")"
+    debug_log "timing.total_ms=$(elapsed_ms "$t_start" "$t_sanitize_done")"
+  fi
+
   printf '%s\n' "$sanitized_output"
 }
 
@@ -353,8 +431,16 @@ while [[ $# -gt 0 ]]; do
       usage
       exit 0
       ;;
-    --print-final-prompt)
-      PRINT_FINAL_PROMPT=1
+    --debug)
+      DEBUG=1
+      shift
+      ;;
+    --stream)
+      STREAM_MODE="on"
+      shift
+      ;;
+    --no-stream)
+      STREAM_MODE="off"
       shift
       ;;
     --)
@@ -388,6 +474,9 @@ if [[ "$INTERACTIVE" -eq 1 ]]; then
   echo "Model: $MODEL"
   echo "Context injection: enabled"
   echo "Context file: $CONTEXT_FILE"
+  if [[ "$DEBUG" -eq 1 ]]; then
+    echo "Debug mode: enabled"
+  fi
   if [[ "$CONTEXT_INLINE_EXPLICIT" -eq 1 ]]; then
     echo "Inline context (--context): provided"
   fi

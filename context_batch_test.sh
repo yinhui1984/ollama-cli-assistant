@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ASSISTANT_SCRIPT="$SCRIPT_DIR/cli-assistant.sh"
 MODEL="cli-assistant"
 OUTPUT_FILE=""
-PRINT_FINAL_PROMPT=1
+DEBUG=0
 CASES_FILE="$SCRIPT_DIR/context_batch_cases_holdout.txt"
 
 CASE_PROMPTS=()
@@ -14,7 +14,7 @@ CASE_CONTEXTS=()
 usage() {
   cat <<'USAGE'
 Usage:
-  context_batch_test.sh [-m MODEL] [-o OUTPUT_FILE] [--cases FILE] [--no-print-final-prompt]
+  context_batch_test.sh [-m MODEL] [-o OUTPUT_FILE] [--cases FILE] [--debug]
 
 Cases format (one case per line):
   1) prompt
@@ -29,7 +29,8 @@ Options:
   -m, --model MODEL          Model name (default: cli-assistant)
   -o, --output FILE          Output report path
   --cases FILE               Cases file path (default: ./context_batch_cases_holdout.txt)
-  --no-print-final-prompt    Do not pass --print-final-prompt to cli-assistant.sh
+  --debug                    Pass --debug to cli-assistant.sh
+  --no-print-final-prompt    Deprecated alias (no-op)
   -h, --help                 Show this help
 USAGE
 }
@@ -58,8 +59,11 @@ while [[ $# -gt 0 ]]; do
       CASES_FILE="$2"
       shift 2
       ;;
+    --debug)
+      DEBUG=1
+      shift
+      ;;
     --no-print-final-prompt)
-      PRINT_FINAL_PROMPT=0
       shift
       ;;
     -h|--help)
@@ -157,8 +161,8 @@ run_case() {
   local cmd_text
   local context_label
 
-  if [[ "$PRINT_FINAL_PROMPT" -eq 1 ]]; then
-    cmd+=("--print-final-prompt")
+  if [[ "$DEBUG" -eq 1 ]]; then
+    cmd+=("--debug")
   fi
 
   if [[ -n "${context//[[:space:]]/}" ]]; then
