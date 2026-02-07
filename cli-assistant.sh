@@ -209,6 +209,91 @@ sanitize_model_output() {
   printf '%s' "$command_line"
 }
 
+normalize_for_clipboard() {
+  local command_line="$1"
+  local fix_enabled="${CLIA_CLIPBOARD_FIX:-1}"
+  local matched=0
+  local original
+
+  original="$(printf '%s' "$command_line" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
+  if [[ "$fix_enabled" == "0" ]]; then
+    printf '%s' "$original"
+    return
+  fi
+
+  # Safety boundary: avoid auto-rewriting potentially destructive commands.
+  if printf '%s\n' "$original" | grep -Eq '(^|[[:space:]])sudo([[:space:]]|$)|(^|[[:space:]])rm([[:space:]]|$)|(^|[[:space:]])dd([[:space:]]|$)|(^|[[:space:]])mkfs([[:space:]]|$)|git[[:space:]]+reset[[:space:]]+--hard'; then
+    printf '%s' "$original"
+    return
+  fi
+
+  # Match only known Linux-only incompatibilities.
+  if printf '%s\n' "$original" | grep -Eq '(^|[[:space:]])date[[:space:]]+-d([[:space:]]|$)|(^|[[:space:]])sed[[:space:]]+-i([[:space:]]|$)|(^|[[:space:]])grep[[:space:]]+-P([[:space:]]|$)|(^|[[:space:]])readlink[[:space:]]+-f([[:space:]]|$)|(^|[[:space:]])stat[[:space:]]+-c([[:space:]]|$)|(^|[[:space:]])find[[:space:]].*-printf([[:space:]]|$)|(^|[[:space:]])xargs[[:space:]]+-r([[:space:]]|$)|xxd[[:space:]]+-r[[:space:]]+-p[[:space:]]*\|[[:space:]]*date[[:space:]]+-f[[:space:]]+-'; then
+    matched=1
+  fi
+
+  if [[ "$matched" -eq 0 ]]; then
+    printf '%s' "$original"
+    return
+  fi
+
+  command_line="$original"
+
+  # date corrections
+  if command -v gdate >/dev/null 2>&1; then
+    command_line="$(printf '%s\n' "$command_line" | perl -pe 's/date\s+-r\s+\$\(\s*echo\s+"?0x([0-9A-Fa-f]+)"?\s*\|\s*xxd\s+-p\s+-r\s*\)/gdate -d "\@\$((16#$1))"/g')"
+    command_line="$(printf '%s\n' "$command_line" | perl -pe 's/echo\s+"?0x([0-9A-Fa-f]+)"?\s*\|\s*xxd\s+-r\s+-p\s*\|\s*date\s+-f\s+-\s+([\"\x27][^\"\x27]+[\"\x27])/gdate -d "\@\$((16#$1))" $2/g')"
+    command_line="$(printf '%s\n' "$command_line" | perl -pe 's/echo\s+"?0x([0-9A-Fa-f]+)"?\s*\|\s*xxd\s+-r\s+-p\s*\|\s*date\s+-f\s+-\s+(\+[\"\x27][^\"\x27]+[\"\x27])/gdate -d "\@\$((16#$1))" $2/g')"
+    command_line="$(printf '%s\n' "$command_line" | perl -pe 's/\bdate\b(?=.*\s-d(?:\s|$))/gdate/g')"
+  else
+    command_line="$(printf '%s\n' "$command_line" | perl -pe 's/\bdate\s+-d\s+["\x27]?\@([0-9]+)["\x27]?(\s+\+[\"\x27][^\"\x27]+[\"\x27])?/date -r $1$2/g')"
+    command_line="$(printf '%s\n' "$command_line" | perl -pe 's/date\s+-r\s+\$\(\s*echo\s+"?0x([0-9A-Fa-f]+)"?\s*\|\s*xxd\s+-p\s+-r\s*\)/date -r \$((16#$1))/g')"
+    command_line="$(printf '%s\n' "$command_line" | perl -pe 's/echo\s+"?0x([0-9A-Fa-f]+)"?\s*\|\s*xxd\s+-r\s+-p\s*\|\s*date\s+-f\s+-\s+([\"\x27][^\"\x27]+[\"\x27])/date -r \$((16#$1)) $2/g')"
+    command_line="$(printf '%s\n' "$command_line" | perl -pe 's/echo\s+"?0x([0-9A-Fa-f]+)"?\s*\|\s*xxd\s+-r\s+-p\s*\|\s*date\s+-f\s+-\s+(\+[\"\x27][^\"\x27]+[\"\x27])/date -r \$((16#$1)) $2/g')"
+  fi
+
+  # sed -i
+  if command -v gsed >/dev/null 2>&1; then
+    command_line="$(printf '%s\n' "$command_line" | perl -pe 's/\bsed\b(?=.*\s-i(?:\s|$))/gsed/g')"
+  else
+    command_line="$(printf '%s\n' "$command_line" | perl -pe 's/\bsed\s+-i(?=\s+)/sed -i '\'''\''/g')"
+  fi
+
+  # grep -P
+  if command -v ggrep >/dev/null 2>&1; then
+    command_line="$(printf '%s\n' "$command_line" | perl -pe 's/\bgrep\b(?=.*\s-P(?:\s|$))/ggrep/g')"
+  fi
+
+  # readlink -f
+  if command -v greadlink >/dev/null 2>&1; then
+    command_line="$(printf '%s\n' "$command_line" | perl -pe 's/\breadlink\b(?=.*\s-f(?:\s|$))/greadlink/g')"
+  elif command -v realpath >/dev/null 2>&1; then
+    command_line="$(printf '%s\n' "$command_line" | perl -pe 's/\breadlink\s+-f\b/realpath/g')"
+  fi
+
+  # stat -c
+  if command -v gstat >/dev/null 2>&1; then
+    command_line="$(printf '%s\n' "$command_line" | perl -pe 's/\bstat\b(?=.*\s-c(?:\s|$))/gstat/g')"
+  else
+    command_line="$(printf '%s\n' "$command_line" | perl -pe 's/\bstat\s+-c\s+[\"\x27]%s %n[\"\x27]/stat -f \"%z %N\"/g')"
+  fi
+
+  # find -printf
+  if command -v gfind >/dev/null 2>&1; then
+    command_line="$(printf '%s\n' "$command_line" | perl -pe 's/\bfind\b(?=.*-printf)/gfind/g')"
+  else
+    command_line="$(printf '%s\n' "$command_line" | perl -pe 's/\s-printf\s+[\"\x27]%p\\n[\"\x27]/ -print/g')"
+    command_line="$(printf '%s\n' "$command_line" | perl -pe 's/\s-printf\s+[\"\x27]%p[\"\x27]/ -print/g')"
+  fi
+
+  # xargs -r
+  command_line="$(printf '%s\n' "$command_line" | perl -pe 's/\bxargs\s+-r(\s+-n[0-9]+)?\s+echo\b/xargs$1 echo/g')"
+  command_line="$(printf '%s\n' "$command_line" | perl -pe 's/\bxargs\s+-r(\s+-n[0-9]+)?\s+printf\b/xargs$1 printf/g')"
+
+  command_line="$(printf '%s' "$command_line" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
+  printf '%s' "$command_line"
+}
+
 build_runtime_context() {
   local os_name
   local current_shell
@@ -256,6 +341,7 @@ run_once() {
   local stream_enabled=0
   local stream_started=0
   local streamed_output=""
+  local clipboard_output=""
 
   t_start="$(now_ms)"
   runtime_context="$(build_runtime_context)"
@@ -332,7 +418,7 @@ Context usage rules:
 - If context includes explicit env var tokens (for example \$RPC_ETH), use those exact tokens verbatim when relevant.
 - Do not rename context-provided env vars into temporary aliases unless the user explicitly asks.
 - Prefer direct usage (for example: anvil --fork-url \$RPC_ETH) over alias chains (for example: RPC_URL=\$RPC_ETH ... --fork-url \$RPC_URL).
-- If a relevant context token exists, do not emit placeholders like YOUR_*.
+- If a relevant context token exists, do not emit placeholders like REQUIRED_*.
 - Preserve the exact task semantics from the user request. Do not replace the requested operation with a nearby but different command.
 - Keep concrete entities unchanged when present: tool name, path, contract/test/function name, chain, block number, host/port, and git message text.
 - Output must be one complete executable command line with balanced quotes/brackets (no truncation).
@@ -385,7 +471,8 @@ User request: $prompt"
       fi
     done < <(ollama run "$MODEL" "$full_prompt")
     printf '\n'
-    if copy_to_clipboard "$streamed_output"; then
+    clipboard_output="$(normalize_for_clipboard "$streamed_output")"
+    if copy_to_clipboard "$clipboard_output"; then
       show_copied_notice
     fi
     return
@@ -427,7 +514,8 @@ User request: $prompt"
   fi
 
   printf '%s\n' "$sanitized_output"
-  if copy_to_clipboard "$sanitized_output"; then
+  clipboard_output="$(normalize_for_clipboard "$sanitized_output")"
+  if copy_to_clipboard "$clipboard_output"; then
     show_copied_notice
   fi
 }

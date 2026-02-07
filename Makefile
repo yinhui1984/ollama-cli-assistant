@@ -1,16 +1,18 @@
 MODEL ?= cli-assistant
-ROOT := /Users/z/Documents/dev/ollama-cli-assistant
+ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 MODEFILE := $(ROOT)/model/ollama-cli-assistant.Modelfile
 BATCH_SCRIPT := $(ROOT)/model/03_batch_test.sh
 CLEAN_SCRIPT := $(ROOT)/model/02_clean_model.sh
+CLIPBOARD_FIX_TEST := $(ROOT)/test_clipboard_fix.sh
 
-.PHONY: help create batch batch-cases clean-model recreate
+.PHONY: help create batch batch-cases clipboard-fix clean-model recreate
 
 help:
 	@echo "Targets:"
 	@echo "  make create                 # Create or update model"
 	@echo "  make batch                  # Run batch test with default holdout cases"
 	@echo "  make batch-cases CASES=...  # Run batch test with custom cases file"
+	@echo "  make clipboard-fix          # Run clipboard Linux->macOS compatibility integration tests"
 	@echo "  make clean-model            # Delete model (non-interactive)"
 	@echo "  make recreate               # clean-model + create"
 	@echo
@@ -29,6 +31,9 @@ batch-cases:
 		exit 1; \
 	fi
 	$(BATCH_SCRIPT) -m $(MODEL) -c $(CASES)
+
+clipboard-fix:
+	$(CLIPBOARD_FIX_TEST)
 
 clean-model:
 	$(CLEAN_SCRIPT) -m $(MODEL) -y

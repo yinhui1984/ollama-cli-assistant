@@ -458,7 +458,7 @@ Context usage rules:
 - If context includes explicit env var tokens (for example \$RPC_ETH), use those exact tokens verbatim when relevant.
 - Do not rename context-provided env vars into temporary aliases unless the user explicitly asks.
 - Prefer direct usage (for example: anvil --fork-url \$RPC_ETH) over alias chains (for example: RPC_URL=\$RPC_ETH ... --fork-url \$RPC_URL).
-- If a relevant context token exists, do not emit placeholders like YOUR_*.
+- If a relevant context token exists, do not emit placeholders like REQUIRED_*.
 - Preserve the exact task semantics from the user request. Do not replace the requested operation with a nearby but different command.
 - Keep concrete entities unchanged when present: tool name, path, contract/test/function name, chain, block number, host/port, and git message text.
 - Output must be one complete executable command line with balanced quotes/brackets (no truncation).

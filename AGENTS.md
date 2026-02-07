@@ -13,7 +13,7 @@
 - `./cli-assistant.sh "<prompt>"`: Run one prompt and return one command.
 - `make -C model create`: Build or update the `cli-assistant` model.
 - `make -C model batch`: Run batch tests with holdout cases and save results.
-- `make -C model batch-cases CASES=/path/to/file.txt`: Use a custom case file.
+- `make -C model batch-cases CASES=./model/04_cases_holdout.txt`: Use a custom case file.
 - `make -C model clean-model`: Remove the model locally.
 - `make -C model recreate`: Clean and rebuild the model.
 
