@@ -82,7 +82,7 @@ export APIKEY_DEEPSEEK="sk-demo-deepseek-key"   # 仅 cli-assistant-deepseek.sh 
 ### 第一步：构建自定义模型（必需）
 
 ```bash
-cd ~/dev/ollama-cli-assistant
+cd <path_to_ollama-cli-assistant>
 make create
 ```
 
@@ -134,10 +134,10 @@ make recreate
 
 ### 基础/macOS
 
-Prompt:
+Command:
 
-```text
-find app named Visual Studio Code
+```bash
+./cli-assistant.sh "find app named Visual Studio Code"
 ```
 
 Output:
@@ -146,10 +146,10 @@ Output:
 mdfind 'Visual Studio Code.app'
 ```
 
-Prompt:
+Command:
 
-```text
-check whether port 8545 is listening
+```bash
+./cli-assistant.sh "check whether port 8545 is listening"
 ```
 
 Output:
@@ -158,10 +158,10 @@ Output:
 lsof -nP -iTCP:8545 -sTCP:LISTEN
 ```
 
-Prompt:
+Command:
 
-```text
-list all listening TCP ports
+```bash
+./cli-assistant.sh "list all listening TCP ports"
 ```
 
 Output:
@@ -170,10 +170,10 @@ Output:
 lsof -nP -iTCP -sTCP:LISTEN
 ```
 
-Prompt:
+Command:
 
-```text
-compute sha256 of README
+```bash
+./cli-assistant.sh "compute sha256 of README"
 ```
 
 Output:
@@ -184,10 +184,10 @@ shasum -a 256 README.md
 
 ### Foundry/Web3
 
-Prompt:
+Command:
 
-```text
-query current block number
+```bash
+./cli-assistant.sh "query current block number"
 ```
 
 Output:
@@ -196,10 +196,10 @@ Output:
 cast block-number --rpc-url $RPC_ETH
 ```
 
-Prompt:
+Command:
 
-```text
-fork mainnet at block 18000000
+```bash
+./cli-assistant.sh "fork mainnet at block 18000000"
 ```
 
 Output:
@@ -208,10 +208,10 @@ Output:
 anvil --fork-url $RPC_ETH --fork-block-number 18000000
 ```
 
-Prompt:
+Command:
 
-```text
-compile only and show contract sizes
+```bash
+./cli-assistant.sh "compile only and show contract sizes"
 ```
 
 Output:
@@ -220,10 +220,10 @@ Output:
 forge build --sizes
 ```
 
-Prompt:
+Command:
 
-```text
-run only test_Deposit in test/Bridge.t.sol with full trace
+```bash
+./cli-assistant.sh "run only test_Deposit in test/Bridge.t.sol with full trace"
 ```
 
 Output:
@@ -315,10 +315,10 @@ make clipboard-fix
 
 | Prompt | `cli-assistant.sh` (stdout -> clipboard) | `cli-assistant-deepseek.sh` |
 |---|---|---|
-| `0x65ff4b03 to datetime` | `echo ... \| date -f - ...` -> `gdate -d "@$((16#65ff4b03))" ...` | `cast block 0x65ff4b03 --rpc-url $RPC_ETH --field timestamp \| xargs -I {} date -r {}` |
-| `grep -P 'a.*b' sample.txt` | `grep -P ...` -> `ggrep -P ...` | `rg -P ...` |
-| `readlink -f ./foo/bar` | `readlink -f ...` -> `greadlink -f ...` | `readlink -f ...` |
-| `echo -e 'a\nb\n' \| xargs -r -n1 echo` | `... -r ...` -> `... -n1 ...` | `... -r ...` |
+| `0x65ff4b03 to datetime` | `echo "0x65ff4b03" \| xxd -r -p \| date -f - +"%Y-%m-%d %H:%M:%S"` -> `gdate -d "@$((16#65ff4b03))" +"%Y-%m-%d %H:%M:%S"` | `cast block 0x65ff4b03 --rpc-url $RPC_ETH --field timestamp \| xargs -I {} date -r {}` |
+| `grep -P 'a.*b' sample.txt` | `grep -P 'a.*b' sample.txt` -> `**ggrep -P 'a.*b' sample.txt**` | `**rg -P 'a.*b' sample.txt**` |
+| `readlink -f ./foo/bar` | `readlink -f ./foo/bar` -> `**greadlink -f ./foo/bar**` | `readlink -f ./foo/bar` |
+| `echo -e 'a\nb\n' \| xargs -r -n1 echo` | `echo -e 'a\nb\n' \| xargs **-r** -n1 echo` -> `echo -e 'a\nb\n' \| xargs -n1 echo` | `echo -e 'a\nb\n' \| xargs **-r** -n1 echo` |
 
 解释：
 
