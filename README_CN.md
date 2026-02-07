@@ -2,17 +2,18 @@
 
 # ollama-cli-assistant
 
-一个面向 macOS 的 CLI 命令编译器：把自然语言转换为一条可直接执行的 zsh 命令。
+一个面向 macOS 的 CLI 命令编译器：把自然语言转换为一条可直接执行的 shell 命令。
 
-本项目面向日常终端使用，强调严格输出契约，以及 Linux->macOS 的剪贴板兼容纠偏能力。
+本项目面向日常终端使用，强调严格输出契约，以及自动将 Linux 风格命令修正为 macOS 兼容命令的能力。
+默认目标 shell 为 macOS 上的 zsh。
 
 ## 项目价值
 
 - 严格单行命令输出（stdout 不混入解释）
 - 默认优先 macOS 原生命令路由（`mdfind`、`lsof`、`shasum` 等）
 - 面向 Foundry/Web3 的命令生成（`forge`、`cast`、`anvil`）
-- 针对常见 Linux-only 参数的 macOS 剪贴板修正
-- 兼容修正具备可复现集成测试
+- 自动将 Linux 风格命令修正为 macOS 兼容命令
+- Linux->macOS 命令修正具备可复现集成测试
 
 与“直接调用通用 LLM”相比的关键差异：
 
@@ -29,7 +30,7 @@
 - `model/02_clean_model.sh`：非交互清理本地模型
 - `model/03_batch_test.sh`：批量测试脚本
 - `model/04_cases_holdout.txt`：默认批量测试集
-- `test_clipboard_fix.sh`：剪贴板兼容集成测试
+- `test_clipboard_fix.sh`：Linux->macOS 命令修正集成测试
 - `Makefile`：统一命令入口
 
 ## 依赖要求
@@ -46,7 +47,7 @@ curl -L https://foundry.paradigm.xyz | bash
 foundryup
 ```
 
-建议安装 GNU 工具增强兼容修正：
+建议安装 GNU 工具增强 Linux->macOS 命令修正：
 
 ```bash
 brew install coreutils gnu-sed grep findutils
@@ -74,7 +75,7 @@ export APIKEY_DEEPSEEK="sk-demo-deepseek-key"   # 仅 cli-assistant-deepseek.sh 
 2. 运行时助手层（`cli-assistant.sh`）
 - 注入运行时与上下文信息
 - 将模型输出规整为一条可执行命令
-- 在 macOS 上做“仅剪贴板”兼容修正
+- 在复制前自动将 Linux 风格命令修正为 macOS 兼容命令
 - 保持 stdout 原样，便于审计；复制内容可直接执行
 
 ## 快速开始
@@ -105,7 +106,7 @@ make create
 为什么模型构建后仍然需要运行时：
 
 - 仅模型质量无法覆盖 shell/runtime 边界问题
-- 包装器提供确定性的命令提取和剪贴板安全修正
+- 包装器提供确定性的命令提取和复制前 Linux->macOS 自动命令修正
 - 这是日常可用性的关键工程边界
 
 ## Make 目标
@@ -232,9 +233,9 @@ Output:
 forge test --match-path test/Bridge.t.sol --match-test test_Deposit -vvvv
 ```
 
-## 剪贴板兼容修正（Linux -> macOS）
+## 自动将 Linux 风格命令修正为 macOS 兼容命令
 
-`cli-assistant.sh` 保持 stdout 原样（便于审计），但会对复制到剪贴板的命令做 macOS 兼容修正。
+`cli-assistant.sh` 保持 stdout 原样（便于审计），并在复制前自动将 Linux 风格命令修正为 macOS 兼容命令。
 
 默认开启：
 
@@ -283,7 +284,7 @@ make batch
 make batch-cases CASES=./model/04_cases_holdout.txt
 ```
 
-### 2) 剪贴板集成测试
+### 2) Linux->macOS 命令修正集成测试
 
 ```bash
 make clipboard-fix
@@ -322,8 +323,8 @@ make clipboard-fix
 
 解释：
 
-- 主脚本保留可审计 stdout，并在复制时做 macOS 纠偏
-- 基线脚本适合做 prompt 路径对比，但不包含同等剪贴板兼容层
+- 主脚本保留可审计 stdout，并在复制前自动做 Linux->macOS 命令修正
+- 基线脚本适合做 prompt 路径对比，但不包含同等 Linux->macOS 命令修正层
 
 ## 配置
 
@@ -374,7 +375,7 @@ make clipboard-fix
 
 - Linux-only 参数差异无法在所有复杂命令形态下 100% 自动转换
 - 复杂正则与复杂 shell 结构可能仍需手工审阅
-- 剪贴板纠偏策略默认偏保守，优先安全
+- Linux->macOS 自动修正策略默认偏保守，优先安全
 
 ## 许可证
 

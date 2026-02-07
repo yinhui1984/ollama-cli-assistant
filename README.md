@@ -2,17 +2,18 @@
 
 # ollama-cli-assistant
 
-A macOS-first CLI command compiler that turns natural language into exactly one runnable zsh command.
+A macOS-first CLI command compiler that turns natural language into exactly one runnable shell command.
 
-This project is designed for daily terminal use with a strict output contract and a practical Linux-to-macOS clipboard correction layer.
+This project is designed for daily terminal use with a strict output contract and automatic correction of Linux-style commands to macOS-compatible commands.
+The default target shell is zsh on macOS.
 
 ## Why this project
 
 - One-line command output contract (no explanation mixed into stdout)
 - macOS-native routing by default (`mdfind`, `lsof`, `shasum`, etc.)
 - Foundry/Web3-aware command generation (`forge`, `cast`, `anvil`)
-- Clipboard correction for common Linux-only flags and behaviors on macOS
-- Reproducible integration tests for compatibility correction
+- Automatic correction of Linux-style commands to macOS-compatible commands
+- Reproducible integration tests for Linux-to-macOS command correction
 
 Core distinction from calling a generic LLM directly:
 
@@ -29,7 +30,7 @@ Core distinction from calling a generic LLM directly:
 - `model/02_clean_model.sh`: Non-interactive local model deletion helper
 - `model/03_batch_test.sh`: Batch test runner
 - `model/04_cases_holdout.txt`: Default batch case set
-- `test_clipboard_fix.sh`: Clipboard compatibility integration tests
+- `test_clipboard_fix.sh`: Linux-to-macOS command correction integration tests
 - `Makefile`: Unified project commands
 
 ## Requirements
@@ -46,7 +47,7 @@ curl -L https://foundry.paradigm.xyz | bash
 foundryup
 ```
 
-Recommended for stronger compatibility correction:
+Recommended for stronger Linux-to-macOS command correction:
 
 ```bash
 brew install coreutils gnu-sed grep findutils
@@ -74,7 +75,7 @@ export APIKEY_DEEPSEEK="sk-demo-deepseek-key"   # only needed for cli-assistant-
 2. Runtime assistant layer (`cli-assistant.sh`)
 - Injects runtime/context hints.
 - Sanitizes model output to one executable line.
-- Applies clipboard-only compatibility correction on macOS.
+- Applies automatic correction of Linux-style commands to macOS-compatible commands before copying.
 - Keeps stdout unchanged for auditability while copying corrected commands for execution.
 
 ## Quick start
@@ -105,7 +106,7 @@ Interactive mode:
 Why runtime is necessary after model creation:
 
 - Model quality alone does not solve shell/runtime edge cases.
-- The wrapper provides deterministic command extraction and clipboard safety fixes.
+- The wrapper provides deterministic command extraction and automatic Linux-to-macOS command correction before copying.
 - It is the boundary that makes daily terminal usage predictable.
 
 ## Make targets
@@ -232,9 +233,9 @@ Output:
 forge test --match-path test/Bridge.t.sol --match-test test_Deposit -vvvv
 ```
 
-## Clipboard correction (Linux -> macOS)
+## Automatic correction of Linux-style commands to macOS-compatible commands
 
-`cli-assistant.sh` keeps stdout unchanged for auditability, but corrects copied commands for common Linux-only incompatibilities.
+`cli-assistant.sh` keeps stdout unchanged for auditability, then applies automatic correction of Linux-style commands to macOS-compatible commands before copying.
 
 Enabled by default:
 
@@ -322,8 +323,8 @@ Snapshot from captured runs (same prompts):
 
 Interpretation:
 
-- The primary script preserves model output for auditability, then applies macOS-focused clipboard correction.
-- The baseline script is useful for prompt-path comparison, but does not provide the same clipboard compatibility layer.
+- The primary script preserves model output for auditability, then applies automatic correction of Linux-style commands to macOS-compatible commands before copying.
+- The baseline script is useful for prompt-path comparison, but does not provide the same Linux-to-macOS command correction layer.
 
 ## Configuration
 
@@ -374,7 +375,7 @@ This gives stable, reusable behavior without repeating the same constraints in e
 
 - Not all Linux-only flags can be perfectly translated in all command shapes.
 - Complex regex or shell constructs may require manual review.
-- Clipboard correction is intentionally conservative for safety.
+- Automatic correction is intentionally conservative for safety.
 
 ## License
 
