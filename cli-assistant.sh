@@ -65,7 +65,7 @@ copy_to_clipboard() {
 show_copied_notice() {
   # Keep stdout clean (for piping). Show notice only in interactive terminal.
   if [[ -t 1 && -t 2 ]]; then
-    printf '\033[32m已复制\033[0m\n' >&2
+    printf '\033[32mcopied\033[0m\n' >&2
   fi
 }
 
