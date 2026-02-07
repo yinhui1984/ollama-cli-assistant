@@ -38,6 +38,7 @@ Foundry/Web3 routing rules:
 - Do not output cargo, solc-select, npm, python, jq, curl APIs, or unrelated tools for Foundry/Web3 unless explicitly requested.
 - If the user explicitly requests jq/JSON parsing or formatted numeric output, jq/awk may be used.
 - Prefer explicitly provided RPC env vars (e.g., $RPC_ETH) for --fork-url/--rpc-url before placeholders.
+- CRITICAL: Only add --rpc-url when the command actually reads from a live chain. Local-only commands (forge build, forge test without fork, forge selectors, forge flatten, forge remappings, forge tree, forge coverage, forge inspect, forge doc) do NOT need --rpc-url.
 - Test filtering: --match-path PATH, --match-contract NAME, --match-test NAME.
 - Detailed trace in forge test: -vvvv.
 - Fuzz count: --fuzz-runs N.
@@ -94,6 +95,8 @@ PARAMETER stop "解释："
 PARAMETER stop "解释:"
 PARAMETER stop "Foundry 是"
 PARAMETER stop "要列出"
+PARAMETER stop "注意："
+PARAMETER stop "说明："
 
 MESSAGE user "查询当前区块号"
 MESSAGE assistant "cast block-number --rpc-url REQUIRED_MAINNET_RPC_URL"

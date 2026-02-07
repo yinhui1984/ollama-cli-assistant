@@ -2,6 +2,7 @@
 set -euo pipefail
 
 MODEL="cli-assistant"
+OLLAMA_HOST="${OLLAMA_HOST:-http://localhost:11434}"
 INTERACTIVE=0
 DEBUG=0
 STREAM_MODE="auto"
@@ -34,6 +35,9 @@ Options:
   --stream            Force streaming model output to stdout
   --no-stream         Force buffered/sanitized single-line output
   -h, --help          Show this help
+
+Environment:
+  OLLAMA_HOST         Ollama API base URL (default: http://localhost:11434)
 USAGE
 }
 
@@ -72,6 +76,12 @@ show_copied_notice() {
 require_ollama() {
   if ! command -v ollama >/dev/null 2>&1; then
     echo "Error: ollama command not found." >&2
+    exit 1
+  fi
+
+  if ! curl -sf "${OLLAMA_HOST}/api/tags" >/dev/null 2>&1; then
+    echo "Error: ollama is not running at ${OLLAMA_HOST}." >&2
+    echo "Start it with: ollama serve" >&2
     exit 1
   fi
 
